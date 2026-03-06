@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: ale-postgres
+    environment:
+      POSTGRES_DB: aledb
+      POSTGRES_USER: ale
+      POSTGRES_PASSWORD: ale
+    ports:
+      - "5432:5432"
+    volumes:
+      - ale-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  ale-postgres-data:
