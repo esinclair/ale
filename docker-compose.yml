@@ -8,8 +8,5 @@ services:
       POSTGRES_PASSWORD: ale
     ports:
       - "5432:5432"
-    volumes:
-      - ale-postgres-data:/var/lib/postgresql/data
-
-volumes:
-  ale-postgres-data:
+    tmpfs:
+      - /var/lib/postgresql/data:mode=0700,uid=999,gid=999
