@@ -1,6 +1,7 @@
 package com.ale.repository;
 
 import java.util.List;
+import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -8,7 +9,7 @@ import org.springframework.stereotype.Repository;
 import com.ale.model.ALEUser;
 
 @Repository
-public interface ALEUserRepository extends JpaRepository<ALEUser, Long> {
+public interface ALEUserRepository extends JpaRepository<ALEUser, UUID> {
 
     /**
      * Exact first-name match via blind index.

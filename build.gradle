@@ -43,6 +43,10 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+tasks.named('bootRun') {
+    jvmArgs = ['-Xmx4g']
+}
+
 tasks.named('test') {
     useJUnitPlatform()
 }
