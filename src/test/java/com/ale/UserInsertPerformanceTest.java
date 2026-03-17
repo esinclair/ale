@@ -2,6 +2,7 @@ package com.ale;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.AfterEach;
@@ -17,8 +18,9 @@ import com.ale.repository.UserRepository;
 @Tag("integration")
 class UserInsertPerformanceTest {
 
-    private static final int USER_COUNT = 20000;
-    private static final int BATCH_SIZE  = 500;
+    private static final int  USER_COUNT = 20000;
+    private static final int  BATCH_SIZE  = 500;
+    private static final UUID TENANT_ID   = UUID.fromString("33333333-3333-3333-3333-333333333333");
 
     // Pools of names and domains used to generate varied data
     private static final String[] FIRST_NAMES = {
@@ -74,7 +76,7 @@ class UserInsertPerformanceTest {
                 String lastName  = LAST_NAMES[i  % LAST_NAMES.length];
                 String userName  = (firstName + "." + lastName + i).toLowerCase();
                 String email     = userName + "@" + DOMAINS[i % DOMAINS.length];
-                batch.add(new User(firstName, lastName, userName, email));
+                batch.add(new User(firstName, lastName, userName, email, TENANT_ID));
             }
 
             userRepository.saveAll(batch);

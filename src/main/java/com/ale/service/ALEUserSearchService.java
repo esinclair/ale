@@ -1,6 +1,7 @@
 package com.ale.service;
 
 import java.util.List;
+import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 
@@ -11,17 +12,10 @@ import com.ale.repository.ALEUserRepository;
 /**
  * Search service for the encrypted {@link ALEUser} entity.
  *
- * <p>Because every field in {@code ALEUser} is AES-256/GCM encrypted at rest, exact-match
- * searches are performed via the HMAC-SHA-256 blind-index columns that the
- * {@link com.ale.encryption.ALEUserEntityListener} maintains automatically on every insert/update.
- *
- * <h3>Search protocol</h3>
- * <ol>
- *   <li>Caller supplies a plaintext search term (e.g. {@code "Smith"}).</li>
- *   <li>This service computes {@code HMAC-SHA-256(searchTerm)} using the same static key that
- *       was used when the row was written.</li>
- *   <li>The resulting digest is compared against the appropriate {@code *_hash} column.</li>
- * </ol>
+ * <p>All search operations are scoped to a single {@code tenantId}.  The supplied plaintext
+ * search term is hashed with {@link EncryptionService#hash(String, UUID)} (which prefixes the
+ * HMAC input with the tenant UUID) before being compared against the appropriate blind-index
+ * column.
  */
 @Service
 public class ALEUserSearchService {
@@ -35,54 +29,53 @@ public class ALEUserSearchService {
         this.encryptionService = encryptionService;
     }
 
-    /**
-     * Exact first-name search via HMAC blind index.
-     */
-    public List<ALEUser> findByFirstName(String firstName) {
+    /** Exact first-name search via HMAC blind index, scoped to {@code tenantId}. */
+    public List<ALEUser> findByFirstName(String firstName, UUID tenantId) {
         try {
-            return aleUserRepository.findByFirstNameHash(encryptionService.hash(firstName));
+            return aleUserRepository.findByFirstNameHashAndTenantId(
+                    encryptionService.hash(firstName), tenantId);
         } catch (Exception e) {
             throw new RuntimeException("Failed to hash firstName search term", e);
         }
     }
 
-    /**
-     * Exact last-name search via HMAC blind index.
-     */
-    public List<ALEUser> findByLastName(String lastName) {
+    /** Exact last-name search via HMAC blind index, scoped to {@code tenantId}. */
+    public List<ALEUser> findByLastName(String lastName, UUID tenantId) {
         try {
-            return aleUserRepository.findByLastNameHash(encryptionService.hash(lastName));
+            return aleUserRepository.findByLastNameHashAndTenantId(
+                    encryptionService.hash(lastName), tenantId);
         } catch (Exception e) {
             throw new RuntimeException("Failed to hash lastName search term", e);
         }
     }
 
     /**
-     * Prefix first-name search: finds all users whose {@code firstName} starts with the
-     * supplied 3-character prefix.  Hashes the prefix and queries the
-     * {@code first_name_prefix_hash} blind-index column — no table scan involved.
+     * Prefix first-name search (3-char) via the {@code first_name_prefix_hash} blind-index,
+     * scoped to {@code tenantId}.
      *
      * @param prefix exactly 3 characters (trailing chars are silently truncated to 3)
      */
-    public List<ALEUser> findByFirstNameStartingWith(String prefix) {
+    public List<ALEUser> findByFirstNameStartingWith(String prefix, UUID tenantId) {
         try {
             String p = prefix.length() <= 3 ? prefix : prefix.substring(0, 3);
-            return aleUserRepository.findByFirstNamePrefixHash(encryptionService.hash(p));
+            return aleUserRepository.findByFirstNamePrefixHashAndTenantId(
+                    encryptionService.hash(p), tenantId);
         } catch (Exception e) {
             throw new RuntimeException("Failed to hash firstName prefix search term", e);
         }
     }
 
     /**
-     * Prefix last-name search: finds all users whose {@code lastName} starts with the
-     * supplied 3-character prefix via the {@code last_name_prefix_hash} blind-index column.
+     * Prefix last-name search (3-char) via the {@code last_name_prefix_hash} blind-index,
+     * scoped to {@code tenantId}.
      *
      * @param prefix exactly 3 characters (trailing chars are silently truncated to 3)
      */
-    public List<ALEUser> findByLastNameStartingWith(String prefix) {
+    public List<ALEUser> findByLastNameStartingWith(String prefix, UUID tenantId) {
         try {
             String p = prefix.length() <= 3 ? prefix : prefix.substring(0, 3);
-            return aleUserRepository.findByLastNamePrefixHash(encryptionService.hash(p));
+            return aleUserRepository.findByLastNamePrefixHashAndTenantId(
+                    encryptionService.hash(p), tenantId);
         } catch (Exception e) {
             throw new RuntimeException("Failed to hash lastName prefix search term", e);
         }

@@ -8,6 +8,7 @@ import java.security.spec.MGF1ParameterSpec;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
+import java.util.UUID;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
@@ -144,6 +145,29 @@ public class EncryptionService {
         if (value == null) return null;
         Mac localMac = (Mac) hmac.clone();
         byte[] digest = localMac.doFinal(value.getBytes("UTF-8"));
+        StringBuilder sb = new StringBuilder(64);
+        for (byte b : digest) {
+            sb.append(String.format("%02x", b));
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Tenant-scoped variant of {@link #hash(String)}.
+     *
+     * <p>Prefixes the HMAC input with {@code tenantId + ":"} so that two different tenants
+     * storing the same plaintext value produce <em>different</em> blind-index digests, preventing
+     * cross-tenant hash collisions.
+     *
+     * @param value    the plaintext value to hash (null returns null)
+     * @param tenantId the tenant UUID to use as a namespace prefix
+     * @return 64-character lowercase hex HMAC digest, or {@code null} for null input
+     */
+    public String hash(String value, UUID tenantId) throws Exception {
+        if (value == null) return null;
+        String prefixed = tenantId.toString() + ":" + value;
+        Mac localMac = (Mac) hmac.clone();
+        byte[] digest = localMac.doFinal(prefixed.getBytes("UTF-8"));
         StringBuilder sb = new StringBuilder(64);
         for (byte b : digest) {
             sb.append(String.format("%02x", b));

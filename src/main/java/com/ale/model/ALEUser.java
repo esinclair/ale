@@ -20,15 +20,15 @@ import java.util.UUID;
  * rest via {@link EncryptedStringConverter}.  The converter uses envelope encryption:
  * each field value is encrypted with AES-256/GCM using a DEK that is itself RSA-wrapped.
  * Both the wrapped DEK and the ciphertext are stored together in a single {@code TEXT} column,
- * separated by {@code |}.  The same DEK is reused for up to
- * {@value com.ale.encryption.EncryptedStringConverter#DEK_REUSE_LIMIT} encryption calls before
- * being automatically rotated.
+ * separated by {@code |}.  The same DEK is reused for up to 1 000 encryption calls (configurable
+ * via {@code EncryptedStringConverter#DEK_REUSE_LIMIT}) before being automatically rotated.
  *
  * <p>Btree indexes are declared on all hash columns so that blind-index lookups (exact and
  * prefix) execute as single index scans rather than full-table scans.
  */
 @Entity
 @Table(name = "aleuser", indexes = {
+    @Index(name = "idx_aleuser_tenant_id",              columnList = "tenant_id"),
     @Index(name = "idx_aleuser_first_name_hash",        columnList = "first_name_hash"),
     @Index(name = "idx_aleuser_first_name_prefix_hash", columnList = "first_name_prefix_hash"),
     @Index(name = "idx_aleuser_last_name_hash",         columnList = "last_name_hash"),
@@ -42,6 +42,10 @@ public class ALEUser {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
+
+    /** Identifies the tenant that owns this record; drives per-tenant DEK selection. */
+    @Column(name = "tenant_id", nullable = false)
+    private UUID tenantId;
 
     @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "first_name", nullable = false, columnDefinition = "TEXT")
@@ -87,15 +91,19 @@ public class ALEUser {
 
     public ALEUser() {}
 
-    public ALEUser(String firstName, String lastName, String userName, String email) {
+    public ALEUser(String firstName, String lastName, String userName, String email, UUID tenantId) {
         this.firstName = firstName;
         this.lastName  = lastName;
         this.userName  = userName;
         this.email     = email;
+        this.tenantId  = tenantId;
     }
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
+
+    public UUID getTenantId() { return tenantId; }
+    public void setTenantId(UUID tenantId) { this.tenantId = tenantId; }
 
     public String getFirstName() { return firstName; }
     public void setFirstName(String firstName) { this.firstName = firstName; }

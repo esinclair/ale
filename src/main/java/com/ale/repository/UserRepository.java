@@ -11,19 +11,17 @@ import com.ale.model.User;
 @Repository
 public interface UserRepository extends JpaRepository<User, UUID> {
 
-    /** Exact match on {@code first_name}. Uses the {@code idx_users_first_name} btree index. */
-    List<User> findByFirstName(String firstName);
+    /** Exact match on {@code first_name} scoped to a tenant. */
+    List<User> findByFirstNameAndTenantId(String firstName, UUID tenantId);
 
-    /** Exact match on {@code last_name}. Uses the {@code idx_users_last_name} btree index. */
-    List<User> findByLastName(String lastName);
+    /** Exact match on {@code last_name} scoped to a tenant. */
+    List<User> findByLastNameAndTenantId(String lastName, UUID tenantId);
 
     /**
-     * Prefix match: {@code WHERE first_name LIKE 'prefix%'}.
-     * PostgreSQL can use the btree index when the collation is C or with
-     * {@code varchar_pattern_ops}; otherwise falls back to a seq-scan over the indexed pages.
+     * Prefix match: {@code WHERE first_name LIKE 'prefix%' AND tenant_id = ?}.
      */
-    List<User> findByFirstNameStartingWith(String prefix);
+    List<User> findByFirstNameStartingWithAndTenantId(String prefix, UUID tenantId);
 
-    /** Prefix match: {@code WHERE last_name LIKE 'prefix%'}. */
-    List<User> findByLastNameStartingWith(String prefix);
+    /** Prefix match: {@code WHERE last_name LIKE 'prefix%' AND tenant_id = ?}. */
+    List<User> findByLastNameStartingWithAndTenantId(String prefix, UUID tenantId);
 }

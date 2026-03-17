@@ -11,6 +11,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "users", indexes = {
+    @Index(name = "idx_users_tenant_id",  columnList = "tenant_id"),
     @Index(name = "idx_users_first_name", columnList = "first_name"),
     @Index(name = "idx_users_last_name",  columnList = "last_name")
 })
@@ -19,6 +20,9 @@ public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
+
+    @Column(name = "tenant_id", nullable = false)
+    private UUID tenantId;
 
     @Column(name = "first_name", nullable = false)
     private String firstName;
@@ -34,15 +38,19 @@ public class User {
 
     public User() {}
 
-    public User(String firstName, String lastName, String userName, String email) {
+    public User(String firstName, String lastName, String userName, String email, UUID tenantId) {
         this.firstName = firstName;
         this.lastName = lastName;
         this.userName = userName;
         this.email = email;
+        this.tenantId = tenantId;
     }
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
+
+    public UUID getTenantId() { return tenantId; }
+    public void setTenantId(UUID tenantId) { this.tenantId = tenantId; }
 
     public String getFirstName() { return firstName; }
     public void setFirstName(String firstName) { this.firstName = firstName; }

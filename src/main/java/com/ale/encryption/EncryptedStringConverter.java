@@ -1,5 +1,8 @@
 package com.ale.encryption;
 
+import java.util.HashMap;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,14 +22,19 @@ import jakarta.persistence.Converter;
  * </pre>
  * The separator {@code |} is safe because Base64 strings never contain it.
  *
- * <h3>DEK reuse</h3>
- * A fresh AES-256 DEK is generated once and reused for up to {@value #DEK_REUSE_LIMIT}
- * encryption calls before being rotated.  The wrapped DEK is stored alongside every record so
- * decryption is always self-contained; records encrypted under different DEKs are handled
- * transparently.
+ * <h3>Per-tenant DEK reuse</h3>
+ * Each tenant is assigned its own rotating AES-256 DEK.  A fresh DEK is generated on first use
+ * for a given tenant and reused for up to {@value #DEK_REUSE_LIMIT} encryption calls before
+ * being automatically rotated.  The wrapped DEK is stored in every record so decryption is
+ * always self-contained — records encrypted under different DEKs are handled transparently.
+ *
+ * <p>The active {@code tenantId} is read from {@link TenantContext} (a thread-local set by
+ * controllers and services before flushing JPA writes).  An {@link IllegalStateException} is
+ * thrown if the context is not populated.
  *
  * <h3>Thread-safety</h3>
- * A {@link ReentrantLock} guards the DEK state so concurrent inserts stay consistent.
+ * A per-tenant {@link ReentrantLock} guards each tenant's DEK state so concurrent inserts
+ * from different tenants do not interfere with each other.
  */
 @Component
 @Converter
@@ -40,10 +48,11 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
     @Autowired
     private EncryptionService encryptionService;
 
-    // ── DEK state (guarded by dekLock) ────────────────────────────────────────
-    private final ReentrantLock dekLock = new ReentrantLock();
-    private EncryptedDek currentDek;
-    private int usageCount = 0;
+    // ── Per-tenant DEK state ───────────────────────────────────────────────────
+    private final ConcurrentHashMap<UUID, ReentrantLock> tenantLocks  = new ConcurrentHashMap<>();
+    // Accessed only while holding the corresponding per-tenant lock:
+    private final HashMap<UUID, EncryptedDek> tenantDeks        = new HashMap<>();
+    private final HashMap<UUID, Integer>      tenantUsageCounts = new HashMap<>();
 
     // ── Encryption ─────────────────────────────────────────────────────────────
 
@@ -52,15 +61,22 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
         if (attribute == null) {
             return null;
         }
+        UUID tenantId = TenantContext.get();
+        if (tenantId == null) {
+            throw new IllegalStateException(
+                "TenantContext is not set. Set TenantContext.set(tenantId) before persisting ALEUser entities.");
+        }
         try {
-            dekLock.lock();
+            ReentrantLock lock = tenantLocks.computeIfAbsent(tenantId, k -> new ReentrantLock());
+            lock.lock();
             try {
-                rotateDekIfNeeded();
-                String encryptedData = encryptionService.encryptWithDek(attribute, currentDek.rawDek());
-                usageCount++;
-                return currentDek.wrappedKey() + SEPARATOR + encryptedData;
+                rotateDekIfNeeded(tenantId);
+                EncryptedDek dek = tenantDeks.get(tenantId);
+                String encryptedData = encryptionService.encryptWithDek(attribute, dek.rawDek());
+                tenantUsageCounts.merge(tenantId, 1, Integer::sum);
+                return dek.wrappedKey() + SEPARATOR + encryptedData;
             } finally {
-                dekLock.unlock();
+                lock.unlock();
             }
         } catch (Exception e) {
             throw new RuntimeException("Failed to encrypt field value", e);
@@ -89,11 +105,13 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
-    /** Must be called while holding {@code dekLock}. */
-    private void rotateDekIfNeeded() throws Exception {
-        if (currentDek == null || usageCount >= DEK_REUSE_LIMIT) {
-            currentDek = encryptionService.generateAndWrapDek();
-            usageCount = 0;
+    /** Must be called while holding the per-tenant lock. */
+    private void rotateDekIfNeeded(UUID tenantId) throws Exception {
+        EncryptedDek current = tenantDeks.get(tenantId);
+        int usage = tenantUsageCounts.getOrDefault(tenantId, 0);
+        if (current == null || usage >= DEK_REUSE_LIMIT) {
+            tenantDeks.put(tenantId, encryptionService.generateAndWrapDek());
+            tenantUsageCounts.put(tenantId, 0);
         }
     }
 }

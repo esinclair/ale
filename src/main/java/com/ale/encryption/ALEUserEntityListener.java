@@ -11,12 +11,6 @@ import jakarta.persistence.PreUpdate;
  * JPA entity listener that computes HMAC-SHA-256 hashes for all {@link ALEUser} string fields
  * immediately before insert ({@link PrePersist}) and update ({@link PreUpdate}).
  *
- * <h3>Spring integration</h3>
- * JPA instantiates entity listeners via {@code new} (outside the Spring container), so
- * direct {@code @Autowired} on instance fields would not work.  Instead, Spring initialises
- * this class as a singleton bean and populates a {@code static} reference to
- * {@link EncryptionService}; all JPA-created instances then share that reference.
- *
  * <h3>Hashes stored</h3>
  * For each of the four fields ({@code firstName}, {@code lastName}, {@code userName},
  * {@code email}) two hashes are computed:
@@ -24,6 +18,15 @@ import jakarta.persistence.PreUpdate;
  *   <li><b>full hash</b>  – HMAC of the complete plaintext value</li>
  *   <li><b>prefix hash</b> – HMAC of the first three characters (for prefix-search use-cases)</li>
  * </ul>
+ * Hashes are computed with the global (non-tenant-scoped) {@link EncryptionService#hash(String)}
+ * method using a single shared HMAC key.  Tenant isolation for searches is enforced at the
+ * query level via the {@code tenant_id} column filter in the repository.
+ *
+ * <h3>Spring integration</h3>
+ * JPA instantiates entity listeners via {@code new} (outside the Spring container), so
+ * direct {@code @Autowired} on instance fields would not work.  Instead, Spring initialises
+ * this class as a singleton bean and populates a {@code static} reference to
+ * {@link EncryptionService}; all JPA-created instances then share that reference.
  */
 @Component
 public class ALEUserEntityListener {

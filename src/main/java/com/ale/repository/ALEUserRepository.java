@@ -12,27 +12,24 @@ import com.ale.model.ALEUser;
 public interface ALEUserRepository extends JpaRepository<ALEUser, UUID> {
 
     /**
-     * Exact first-name match via blind index.
-     * Caller must supply {@code HMAC-SHA-256(plaintext)} — see
-     * {@link com.ale.encryption.EncryptionService#hash}.
+     * Exact first-name match scoped to a tenant via the blind index.
+     * Caller must supply {@code HMAC-SHA-256(tenantId + ":" + plaintext)} — see
+     * {@link com.ale.encryption.EncryptionService#hash(String, java.util.UUID)}.
      */
-    List<ALEUser> findByFirstNameHash(String firstNameHash);
+    List<ALEUser> findByFirstNameHashAndTenantId(String firstNameHash, UUID tenantId);
 
     /**
-     * Exact last-name match via blind index.
-     * Caller must supply {@code HMAC-SHA-256(plaintext)}.
+     * Exact last-name match scoped to a tenant via the blind index.
      */
-    List<ALEUser> findByLastNameHash(String lastNameHash);
+    List<ALEUser> findByLastNameHashAndTenantId(String lastNameHash, UUID tenantId);
 
     /**
-     * Prefix first-name match via the 3-char prefix blind index.
-     * Caller must supply {@code HMAC-SHA-256(first3Chars)}.
+     * Prefix first-name match (3-char) scoped to a tenant via the prefix blind index.
      */
-    List<ALEUser> findByFirstNamePrefixHash(String firstNamePrefixHash);
+    List<ALEUser> findByFirstNamePrefixHashAndTenantId(String firstNamePrefixHash, UUID tenantId);
 
     /**
-     * Prefix last-name match via the 3-char prefix blind index.
-     * Caller must supply {@code HMAC-SHA-256(first3Chars)}.
+     * Prefix last-name match (3-char) scoped to a tenant via the prefix blind index.
      */
-    List<ALEUser> findByLastNamePrefixHash(String lastNamePrefixHash);
+    List<ALEUser> findByLastNamePrefixHashAndTenantId(String lastNamePrefixHash, UUID tenantId);
 }

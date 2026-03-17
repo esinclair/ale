@@ -2,10 +2,12 @@ package com.ale.service;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.ale.encryption.TenantContext;
 import com.ale.model.ALEUser;
 import com.ale.model.User;
 import com.ale.repository.ALEUserRepository;
@@ -85,11 +87,11 @@ public class TestDataService {
      * memory usage stays flat regardless of {@code count}.
      */
     @Transactional
-    public Map<String, Object> loadUsers(int count) {
+    public Map<String, Object> loadUsers(int count, UUID tenantId) {
         long start = System.currentTimeMillis();
 
         for (int i = 0; i < count; i++) {
-            entityManager.persist(buildUser(i));
+            entityManager.persist(buildUser(i, tenantId));
             if ((i + 1) % BATCH_SIZE == 0) {
                 entityManager.flush();
                 entityManager.clear();
@@ -102,19 +104,26 @@ public class TestDataService {
 
     /**
      * Inserts {@code count} {@link ALEUser} rows using JDBC batch writes.
-     * The {@link com.ale.encryption.ALEUserEntityListener} fires on every persist call and
-     * computes HMAC hashes + AES-256/GCM field encryption transparently before each flush.
+     * {@link TenantContext} is set for the duration of the operation so that
+     * {@link com.ale.encryption.EncryptedStringConverter} selects the correct per-tenant DEK.
      */
     @Transactional
-    public Map<String, Object> loadALEUsers(int count) {
+    public Map<String, Object> loadALEUsers(int count, UUID tenantId) {
         long start = System.currentTimeMillis();
-
-        for (int i = 0; i < count; i++) {
-            entityManager.persist(buildALEUser(i));
-            if ((i + 1) % BATCH_SIZE == 0) {
-                entityManager.flush();
-                entityManager.clear();
+        TenantContext.set(tenantId);
+        try {
+            for (int i = 0; i < count; i++) {
+                entityManager.persist(buildALEUser(i, tenantId));
+                if ((i + 1) % BATCH_SIZE == 0) {
+                    entityManager.flush();
+                    entityManager.clear();
+                }
             }
+            // Flush remaining entities while TenantContext is still set.
+            entityManager.flush();
+            entityManager.clear();
+        } finally {
+            TenantContext.clear();
         }
 
         long elapsed = System.currentTimeMillis() - start;
@@ -148,20 +157,20 @@ public class TestDataService {
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
-    private User buildUser(int i) {
+    private User buildUser(int i, UUID tenantId) {
         String firstName = FIRST_NAMES[i % FIRST_NAMES.length];
         String lastName  = LAST_NAMES [i % LAST_NAMES.length];
         String userName  = (firstName + "." + lastName + i).toLowerCase();
         String email     = userName + "@" + DOMAINS[i % DOMAINS.length];
-        return new User(firstName, lastName, userName, email);
+        return new User(firstName, lastName, userName, email, tenantId);
     }
 
-    private ALEUser buildALEUser(int i) {
+    private ALEUser buildALEUser(int i, UUID tenantId) {
         String firstName = FIRST_NAMES[i % FIRST_NAMES.length];
         String lastName  = LAST_NAMES [i % LAST_NAMES.length];
         String userName  = (firstName + "." + lastName + i).toLowerCase();
         String email     = userName + "@" + DOMAINS[i % DOMAINS.length];
-        return new ALEUser(firstName, lastName, userName, email);
+        return new ALEUser(firstName, lastName, userName, email, tenantId);
     }
 
     private Map<String, Object> buildResult(String target, int count, long elapsedMs) {

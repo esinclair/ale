@@ -2,6 +2,7 @@ package com.ale;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.AfterAll;
@@ -43,6 +44,7 @@ class UserSearchPerformanceTest {
     private static final int    USER_COUNT        = 20_000;
     private static final int    BATCH_SIZE        = 500;
     private static final int    EXPECTED_PER_NAME = USER_COUNT / 80; // 250
+    private static final UUID   TENANT_ID         = UUID.fromString("44444444-4444-4444-4444-444444444444");
 
     private static final String[] FIRST_NAMES = {
         "James", "Mary", "John", "Patricia", "Robert", "Jennifer", "Michael", "Linda",
@@ -93,7 +95,7 @@ class UserSearchPerformanceTest {
                 String fn = FIRST_NAMES[i % FIRST_NAMES.length];
                 String ln = LAST_NAMES [i % LAST_NAMES.length];
                 String un = (fn + "." + ln + i).toLowerCase();
-                batch.add(new User(fn, ln, un, un + "@" + DOMAINS[i % DOMAINS.length]));
+                batch.add(new User(fn, ln, un, un + "@" + DOMAINS[i % DOMAINS.length], TENANT_ID));
             }
             userRepository.saveAll(batch);
             inserted = end;
@@ -124,7 +126,7 @@ class UserSearchPerformanceTest {
 
         for (String target : targets) {
             long start   = System.currentTimeMillis();
-            List<User> r = userSearchService.findByFirstName(target);
+            List<User> r = userSearchService.findByFirstName(target, TENANT_ID);
             long elapsed = System.currentTimeMillis() - start;
 
             assertThat(r).hasSize(EXPECTED_PER_NAME);
@@ -149,7 +151,7 @@ class UserSearchPerformanceTest {
 
         for (String target : targets) {
             long start   = System.currentTimeMillis();
-            List<User> r = userSearchService.findByLastName(target);
+            List<User> r = userSearchService.findByLastName(target, TENANT_ID);
             long elapsed = System.currentTimeMillis() - start;
 
             assertThat(r).hasSize(EXPECTED_PER_NAME);
@@ -184,7 +186,7 @@ class UserSearchPerformanceTest {
             String prefix   = c[0];
             String expected = c[1];
             long start      = System.currentTimeMillis();
-            List<User> r    = userSearchService.findByFirstNameStartingWith(prefix);
+            List<User> r    = userSearchService.findByFirstNameStartingWith(prefix, TENANT_ID);
             long elapsed    = System.currentTimeMillis() - start;
 
             assertThat(r).isNotEmpty();

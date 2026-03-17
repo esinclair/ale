@@ -2,6 +2,7 @@ package com.ale;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.AfterEach;
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import com.ale.encryption.TenantContext;
 import com.ale.model.ALEUser;
 import com.ale.repository.ALEUserRepository;
 
@@ -17,8 +19,9 @@ import com.ale.repository.ALEUserRepository;
 @Tag("integration")
 class ALEUserInsertPerformanceTest {
 
-    private static final int USER_COUNT = 20000;
-    private static final int BATCH_SIZE  = 500;
+    private static final int  USER_COUNT = 20000;
+    private static final int  BATCH_SIZE  = 500;
+    private static final UUID TENANT_ID   = UUID.fromString("11111111-1111-1111-1111-111111111111");
 
     private static final String[] FIRST_NAMES = {
         "James", "Mary", "John", "Patricia", "Robert", "Jennifer", "Michael", "Linda",
@@ -73,10 +76,15 @@ class ALEUserInsertPerformanceTest {
                 String lastName  = LAST_NAMES[i  % LAST_NAMES.length];
                 String userName  = (firstName + "." + lastName + i).toLowerCase();
                 String email     = userName + "@" + DOMAINS[i % DOMAINS.length];
-                batch.add(new ALEUser(firstName, lastName, userName, email));
+                batch.add(new ALEUser(firstName, lastName, userName, email, TENANT_ID));
             }
 
-            aleUserRepository.saveAll(batch);
+            TenantContext.set(TENANT_ID);
+            try {
+                aleUserRepository.saveAll(batch);
+            } finally {
+                TenantContext.clear();
+            }
             inserted = end;
         }
 
