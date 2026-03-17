@@ -5,6 +5,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -13,6 +14,7 @@ import com.ale.model.ALEUser;
 import com.ale.repository.ALEUserRepository;
 
 @SpringBootTest
+@Tag("integration")
 class ALEUserInsertPerformanceTest {
 
     private static final int USER_COUNT = 20000;

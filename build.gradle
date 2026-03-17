@@ -38,9 +38,16 @@ dependencies {
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
 
+    // Caching (Spring Cache + Caffeine)
+    implementation 'org.springframework.boot:spring-boot-starter-cache'
+    implementation 'com.github.ben-manes.caffeine:caffeine'
+
     // Spring Boot Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    // H2 in-memory database for unit tests (no PostgreSQL required)
+    testRuntimeOnly 'com.h2database:h2'
 }
 
 tasks.named('bootRun') {
@@ -48,5 +55,19 @@ tasks.named('bootRun') {
 }
 
 tasks.named('test') {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        // Performance / integration tests require a live PostgreSQL instance.
+        // Run them explicitly via:  ./gradlew integrationTest
+        excludeTags 'integration'
+    }
+}
+
+// Separate task for tests that require a live PostgreSQL database
+tasks.register('integrationTest', Test) {
+    description = 'Runs integration tests that require a live PostgreSQL instance.'
+    group = 'verification'
+    useJUnitPlatform {
+        includeTags 'integration'
+    }
+    shouldRunAfter tasks.named('test')
 }

@@ -19,6 +19,7 @@ import javax.crypto.spec.PSource;
 import javax.crypto.spec.SecretKeySpec;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
@@ -196,7 +197,30 @@ public class EncryptionService {
      * @return the original plaintext
      */
     public String decryptField(String wrappedKey, String encryptedData) throws Exception {
-        return decrypt(new EncryptedPayload(wrappedKey, encryptedData));
+        SecretKey dek = unwrapDek(wrappedKey);
+        byte[] ivAndCiphertext = Base64.getDecoder().decode(encryptedData);
+        GCMParameterSpec spec = new GCMParameterSpec(GCM_TAG_BITS, ivAndCiphertext, 0, GCM_IV_BYTES);
+        Cipher aesCipher = Cipher.getInstance(AES_GCM);
+        aesCipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(dek.getEncoded(), "AES"), spec);
+        byte[] plaintext = aesCipher.doFinal(ivAndCiphertext, GCM_IV_BYTES, ivAndCiphertext.length - GCM_IV_BYTES);
+        return new String(plaintext, "UTF-8");
+    }
+
+    /**
+     * Unwraps a Base64-encoded RSA-wrapped DEK using the RSA private key.
+     *
+     * <p>Results are cached in {@code dek-cache} with a 20-second TTL (configured on the
+     * {@code CacheManager} bean).  The {@code wrappedKey} string is the cache key; because the
+     * same wrapped bytes always produce the same DEK this is both safe and correct.
+     *
+     * @param wrappedKey Base64-encoded RSA-wrapped AES-256 DEK
+     * @return the unwrapped {@link SecretKey}
+     */
+    @Cacheable(cacheNames = "dek-cache", key = "#wrappedKey")
+    public SecretKey unwrapDek(String wrappedKey) throws Exception {
+        Cipher rsaCipher = Cipher.getInstance(RSA_OAEP);
+        rsaCipher.init(Cipher.UNWRAP_MODE, privateKey, oaepParams());
+        return (SecretKey) rsaCipher.unwrap(Base64.getDecoder().decode(wrappedKey), "AES", Cipher.SECRET_KEY);
     }
 
     private static OAEPParameterSpec oaepParams() {
