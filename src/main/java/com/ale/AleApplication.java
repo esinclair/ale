@@ -16,7 +16,7 @@ import org.springframework.cache.caffeine.CaffeineCacheManager;
 public class AleApplication {
 
     /** Maximum time-to-live for cached DEKs (seconds). */
-    private static final long DEK_CACHE_TTL_SECONDS = 20;
+    private static final long DEK_CACHE_TTL_SECONDS = 2;
 
     public static void main(String[] args) {
         SpringApplication.run(AleApplication.class, args);

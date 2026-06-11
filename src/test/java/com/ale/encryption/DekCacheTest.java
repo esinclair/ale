@@ -11,12 +11,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cache.CacheManager;
 
+import java.util.Objects;
+
 /**
  * Verifies that the Caffeine-backed {@code dek-cache} behaves correctly:
  * <ul>
  *   <li>Cache hit: the same {@link SecretKey} instance is returned for the same wrapped key.</li>
  *   <li>Cache miss: a different wrapped key produces a different instance.</li>
- *   <li>TTL expiry: after 20 s the entry is evicted and a new instance is returned.</li>
+ *   <li>TTL expiry: after 3 s the entry is evicted and a new instance is returned.</li>
  * </ul>
  *
  * <p>Identity comparison ({@code assertSame} / {@code assertNotSame}) is the correct signal here:
@@ -34,7 +36,7 @@ class DekCacheTest {
 
     @BeforeEach
     void clearCache() {
-        cacheManager.getCache("dek-cache").clear();
+        Objects.requireNonNull(cacheManager.getCache("dek-cache")).clear();
     }
 
     // ── 1. Cache hit ──────────────────────────────────────────────────────────
@@ -74,13 +76,12 @@ class DekCacheTest {
 
         SecretKey before = encryptionService.unwrapDek(wrappedKey);
 
-        // Wait for the 20-second TTL to expire (plus a small margin)
-        Thread.sleep(21_000);
+        // Wait for the 2-second TTL to expire (plus a 1-second margin)
+        Thread.sleep(3_000);
 
         SecretKey after = encryptionService.unwrapDek(wrappedKey);
 
         assertNotSame(before, after,
-                "Expected a new SecretKey instance after the 20s TTL has expired (cache eviction)");
+                "Expected a new SecretKey instance after the 2s TTL has expired (cache eviction)");
     }
 }
-

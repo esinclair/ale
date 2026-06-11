@@ -60,6 +60,9 @@ tasks.named('test') {
         // Run them explicitly via:  ./gradlew integrationTest
         excludeTags 'integration'
     }
+
+    // Generous heap per fork on a 128 GB machine; G1 keeps pause times short.
+    jvmArgs '-Xms512m', '-Xmx4g', '-XX:+UseG1GC'
 }
 
 // Separate task for tests that require a live PostgreSQL database
@@ -70,4 +73,10 @@ tasks.register('integrationTest', Test) {
         includeTags 'integration'
     }
     shouldRunAfter tasks.named('test')
+
+    // Integration tests share one PostgreSQL instance and call deleteAll() in
+    // @AfterEach, so concurrent forks would delete each other's rows.
+    // Keep forks=1; still give the single JVM plenty of memory.
+    maxParallelForks = 1
+    jvmArgs '-Xms512m', '-Xmx4g', '-XX:+UseG1GC'
 }
