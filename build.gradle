@@ -1,7 +1,10 @@
+import org.openapitools.generator.gradle.plugin.tasks.ValidateTask
+
 plugins {
     id 'java'
     id 'org.springframework.boot' version '3.5.0'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'org.openapi.generator' version '7.10.0'
 }
 
 group = 'com.ale'
@@ -42,6 +45,11 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-cache'
     implementation 'com.github.ben-manes.caffeine:caffeine'
 
+    // OpenAPI generated interface support (Swagger annotations used by generated code)
+    implementation 'io.swagger.core.v3:swagger-annotations:2.2.21'
+    // Validation API – required by the generated model stubs (@NotNull annotations)
+    implementation 'jakarta.validation:jakarta.validation-api'
+
     // Spring Boot Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -49,6 +57,76 @@ dependencies {
     // H2 in-memory database for unit tests (no PostgreSQL required)
     testRuntimeOnly 'com.h2database:h2'
 }
+
+// ── OpenAPI code generation ────────────────────────────────────────────────────
+
+// The default single-spec openApiGenerate task is intentionally left
+// unconfigured (no inputSpec). Per-spec tasks below handle generation.
+
+def publicApiOut = "${layout.buildDirectory.get()}/generated/sources/openapi/public"
+def adminApiOut  = "${layout.buildDirectory.get()}/generated/sources/openapi/admin"
+
+def commonConfig = [
+    interfaceOnly        : 'true',
+    useSpringBoot3       : 'true',
+    skipDefaultInterface : 'true',
+    openApiNullable      : 'false',
+    useBeanValidation    : 'false',
+    useTags              : 'true',
+    hideGenerationTimestamp: 'true',
+]
+
+tasks.register('generatePublicApi', org.openapitools.generator.gradle.plugin.tasks.GenerateTask) {
+    generatorName      = 'spring'
+    inputSpec          = "${projectDir}/src/main/openapi/public-api.yaml"
+    outputDir          = publicApiOut
+    apiPackage         = 'com.ale.openapi.pub.api'
+    modelPackage       = 'com.ale.openapi.pub.model'
+    generateApiTests   = false
+    generateModelTests = false
+    importMappings     = ['User': 'com.ale.model.User', 'ALEUser': 'com.ale.model.ALEUser']
+    configOptions      = commonConfig
+}
+
+tasks.register('generateAdminApi', org.openapitools.generator.gradle.plugin.tasks.GenerateTask) {
+    generatorName      = 'spring'
+    inputSpec          = "${projectDir}/src/main/openapi/admin-api.yaml"
+    outputDir          = adminApiOut
+    apiPackage         = 'com.ale.openapi.admin.api'
+    modelPackage       = 'com.ale.openapi.admin.model'
+    generateApiTests   = false
+    generateModelTests = false
+    configOptions      = commonConfig
+}
+
+tasks.register('validatePublicOpenApi', ValidateTask) {
+    inputSpec = "${projectDir}/src/main/openapi/public-api.yaml"
+}
+
+tasks.register('validateAdminOpenApi', ValidateTask) {
+    inputSpec = "${projectDir}/src/main/openapi/admin-api.yaml"
+}
+
+tasks.register('generateOpenApiInterfaces') {
+    group = 'openapi tools'
+    description = 'Validates public/admin specs and generates Spring interfaces for both.'
+    dependsOn tasks.named('validatePublicOpenApi'), tasks.named('validateAdminOpenApi')
+    dependsOn tasks.named('generatePublicApi'), tasks.named('generateAdminApi')
+}
+
+// Add generated source directories to the main source set
+sourceSets {
+    main {
+        java {
+            srcDir "${publicApiOut}/src/main/java"
+            srcDir "${adminApiOut}/src/main/java"
+        }
+    }
+}
+
+compileJava.dependsOn tasks.named('generateOpenApiInterfaces')
+
+// ── Runtime tasks ──────────────────────────────────────────────────────────────
 
 tasks.named('bootRun') {
     jvmArgs = ['-Xmx4g']

@@ -5,24 +5,22 @@ import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.ale.model.User;
+import com.ale.openapi.pub.api.UsersApi;
 import com.ale.repository.UserRepository;
 import com.ale.service.UserSearchService;
 
+/**
+ * Implements {@link UsersApi} – the generated Spring interface derived from
+ * {@code src/main/openapi/public-api.yaml} (tag: Users).
+ *
+ * <p>All routing annotations (@RequestMapping, @GetMapping, …) live on the
+ * interface; this class only carries @RestController and the business logic.
+ */
 @RestController
-@RequestMapping("/users")
-public class UserController {
+public class UserController implements UsersApi {
 
     private final UserRepository userRepository;
     private final UserSearchService userSearchService;
@@ -32,46 +30,41 @@ public class UserController {
         this.userSearchService = userSearchService;
     }
 
-    @GetMapping
-    public List<User> getAllUsers() {
-        return userRepository.findAll();
+    @Override
+    public ResponseEntity<List<User>> getAllUsers() {
+        return ResponseEntity.ok(userRepository.findAll());
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<User> getUserById(@PathVariable UUID id) {
+    @Override
+    public ResponseEntity<User> getUserById(UUID id) {
         return userRepository.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @PostMapping
-    public ResponseEntity<User> createUser(
-            @RequestHeader("X-Tenant-ID") UUID tenantId,
-            @RequestBody User user) {
-        user.setTenantId(tenantId);
+    @Override
+    public ResponseEntity<User> createUser(UUID xTenantID, User user) {
+        user.setTenantId(xTenantID);
         User saved = userRepository.save(user);
         return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
 
-    @PutMapping("/{id}")
-    public ResponseEntity<User> updateUser(
-            @RequestHeader("X-Tenant-ID") UUID tenantId,
-            @PathVariable UUID id,
-            @RequestBody User updated) {
+    @Override
+    public ResponseEntity<User> updateUser(UUID xTenantID, UUID id, User user) {
         return userRepository.findById(id)
-                .map(user -> {
-                    user.setFirstName(updated.getFirstName());
-                    user.setLastName(updated.getLastName());
-                    user.setUserName(updated.getUserName());
-                    user.setEmail(updated.getEmail());
-                    user.setTenantId(tenantId);
-                    return ResponseEntity.ok(userRepository.save(user));
+                .map(existing -> {
+                    existing.setFirstName(user.getFirstName());
+                    existing.setLastName(user.getLastName());
+                    existing.setUserName(user.getUserName());
+                    existing.setEmail(user.getEmail());
+                    existing.setTenantId(xTenantID);
+                    return ResponseEntity.ok(userRepository.save(existing));
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteUser(@PathVariable UUID id) {
+    @Override
+    public ResponseEntity<Void> deleteUser(UUID id) {
         if (!userRepository.existsById(id)) {
             return ResponseEntity.notFound().build();
         }
@@ -79,31 +72,23 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/search/first-name")
-    public List<User> searchByFirstName(
-            @RequestHeader("X-Tenant-ID") UUID tenantId,
-            @RequestParam("value") String value) {
-        return userSearchService.findByFirstName(value, tenantId);
+    @Override
+    public ResponseEntity<List<User>> searchUsersByFirstName(UUID xTenantID, String value) {
+        return ResponseEntity.ok(userSearchService.findByFirstName(value, xTenantID));
     }
 
-    @GetMapping("/search/last-name")
-    public List<User> searchByLastName(
-            @RequestHeader("X-Tenant-ID") UUID tenantId,
-            @RequestParam("value") String value) {
-        return userSearchService.findByLastName(value, tenantId);
+    @Override
+    public ResponseEntity<List<User>> searchUsersByLastName(UUID xTenantID, String value) {
+        return ResponseEntity.ok(userSearchService.findByLastName(value, xTenantID));
     }
 
-    @GetMapping("/search/first-name-prefix")
-    public List<User> searchByFirstNamePrefix(
-            @RequestHeader("X-Tenant-ID") UUID tenantId,
-            @RequestParam("prefix") String prefix) {
-        return userSearchService.findByFirstNameStartingWith(prefix, tenantId);
+    @Override
+    public ResponseEntity<List<User>> searchUsersByFirstNamePrefix(UUID xTenantID, String prefix) {
+        return ResponseEntity.ok(userSearchService.findByFirstNameStartingWith(prefix, xTenantID));
     }
 
-    @GetMapping("/search/last-name-prefix")
-    public List<User> searchByLastNamePrefix(
-            @RequestHeader("X-Tenant-ID") UUID tenantId,
-            @RequestParam("prefix") String prefix) {
-        return userSearchService.findByLastNameStartingWith(prefix, tenantId);
+    @Override
+    public ResponseEntity<List<User>> searchUsersByLastNamePrefix(UUID xTenantID, String prefix) {
+        return ResponseEntity.ok(userSearchService.findByLastNameStartingWith(prefix, xTenantID));
     }
 }

@@ -5,33 +5,27 @@ import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.ale.encryption.TenantContext;
 import com.ale.model.ALEUser;
+import com.ale.openapi.pub.api.AleUsersApi;
 import com.ale.repository.ALEUserRepository;
 import com.ale.service.ALEUserSearchService;
 
 /**
- * REST controller for {@link ALEUser}.
+ * Implements {@link AleUsersApi} – the generated Spring interface derived from
+ * {@code src/main/openapi/public-api.yaml} (tag: AleUsers).
  *
- * <p>Every endpoint requires an {@code X-Tenant-ID} header (a UUID string).  Write endpoints
- * (POST, PUT) set {@link TenantContext} so that {@link com.ale.encryption.EncryptedStringConverter}
- * selects the correct per-tenant DEK during Hibernate flush; the context is always cleared in a
+ * <p>Write endpoints (POST, PUT) set {@link TenantContext} so that
+ * {@link com.ale.encryption.EncryptedStringConverter} selects the correct
+ * per-tenant DEK during Hibernate flush; the context is always cleared in a
  * {@code finally} block after the repository call.
+ *
+ * <p>All routing annotations live on the interface.
  */
 @RestController
-@RequestMapping("/ale-users")
-public class ALEUserController {
+public class ALEUserController implements AleUsersApi {
 
     private final ALEUserRepository aleUserRepository;
     private final ALEUserSearchService aleUserSearchService;
@@ -41,46 +35,41 @@ public class ALEUserController {
         this.aleUserSearchService = aleUserSearchService;
     }
 
-    @GetMapping
-    public List<ALEUser> getAllALEUsers() {
-        return aleUserRepository.findAll();
+    @Override
+    public ResponseEntity<List<ALEUser>> getAllAleUsers() {
+        return ResponseEntity.ok(aleUserRepository.findAll());
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<ALEUser> getALEUserById(@PathVariable UUID id) {
+    @Override
+    public ResponseEntity<ALEUser> getAleUserById(UUID id) {
         return aleUserRepository.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @PostMapping
-    public ResponseEntity<ALEUser> createALEUser(
-            @RequestHeader("X-Tenant-ID") UUID tenantId,
-            @RequestBody ALEUser aleUser) {
-        aleUser.setTenantId(tenantId);
-        TenantContext.set(tenantId);
+    @Override
+    public ResponseEntity<ALEUser> createAleUser(UUID xTenantID, ALEUser alEUser) {
+        alEUser.setTenantId(xTenantID);
+        TenantContext.set(xTenantID);
         try {
-            ALEUser saved = aleUserRepository.save(aleUser);
+            ALEUser saved = aleUserRepository.save(alEUser);
             return ResponseEntity.status(HttpStatus.CREATED).body(saved);
         } finally {
             TenantContext.clear();
         }
     }
 
-    @PutMapping("/{id}")
-    public ResponseEntity<ALEUser> updateALEUser(
-            @RequestHeader("X-Tenant-ID") UUID tenantId,
-            @PathVariable UUID id,
-            @RequestBody ALEUser updated) {
-        TenantContext.set(tenantId);
+    @Override
+    public ResponseEntity<ALEUser> updateAleUser(UUID xTenantID, UUID id, ALEUser alEUser) {
+        TenantContext.set(xTenantID);
         try {
             return aleUserRepository.findById(id)
                     .map(user -> {
-                        user.setFirstName(updated.getFirstName());
-                        user.setLastName(updated.getLastName());
-                        user.setUserName(updated.getUserName());
-                        user.setEmail(updated.getEmail());
-                        user.setTenantId(tenantId);
+                        user.setFirstName(alEUser.getFirstName());
+                        user.setLastName(alEUser.getLastName());
+                        user.setUserName(alEUser.getUserName());
+                        user.setEmail(alEUser.getEmail());
+                        user.setTenantId(xTenantID);
                         return ResponseEntity.ok(aleUserRepository.save(user));
                     })
                     .orElse(ResponseEntity.notFound().build());
@@ -89,8 +78,8 @@ public class ALEUserController {
         }
     }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteALEUser(@PathVariable UUID id) {
+    @Override
+    public ResponseEntity<Void> deleteAleUser(UUID id) {
         if (!aleUserRepository.existsById(id)) {
             return ResponseEntity.notFound().build();
         }
@@ -98,31 +87,23 @@ public class ALEUserController {
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/search/first-name")
-    public List<ALEUser> searchByFirstName(
-            @RequestHeader("X-Tenant-ID") UUID tenantId,
-            @RequestParam("value") String value) {
-        return aleUserSearchService.findByFirstName(value, tenantId);
+    @Override
+    public ResponseEntity<List<ALEUser>> searchAleUsersByFirstName(UUID xTenantID, String value) {
+        return ResponseEntity.ok(aleUserSearchService.findByFirstName(value, xTenantID));
     }
 
-    @GetMapping("/search/last-name")
-    public List<ALEUser> searchByLastName(
-            @RequestHeader("X-Tenant-ID") UUID tenantId,
-            @RequestParam("value") String value) {
-        return aleUserSearchService.findByLastName(value, tenantId);
+    @Override
+    public ResponseEntity<List<ALEUser>> searchAleUsersByLastName(UUID xTenantID, String value) {
+        return ResponseEntity.ok(aleUserSearchService.findByLastName(value, xTenantID));
     }
 
-    @GetMapping("/search/first-name-prefix")
-    public List<ALEUser> searchByFirstNamePrefix(
-            @RequestHeader("X-Tenant-ID") UUID tenantId,
-            @RequestParam("prefix") String prefix) {
-        return aleUserSearchService.findByFirstNameStartingWith(prefix, tenantId);
+    @Override
+    public ResponseEntity<List<ALEUser>> searchAleUsersByFirstNamePrefix(UUID xTenantID, String prefix) {
+        return ResponseEntity.ok(aleUserSearchService.findByFirstNameStartingWith(prefix, xTenantID));
     }
 
-    @GetMapping("/search/last-name-prefix")
-    public List<ALEUser> searchByLastNamePrefix(
-            @RequestHeader("X-Tenant-ID") UUID tenantId,
-            @RequestParam("prefix") String prefix) {
-        return aleUserSearchService.findByLastNameStartingWith(prefix, tenantId);
+    @Override
+    public ResponseEntity<List<ALEUser>> searchAleUsersByLastNamePrefix(UUID xTenantID, String prefix) {
+        return ResponseEntity.ok(aleUserSearchService.findByLastNameStartingWith(prefix, xTenantID));
     }
 }

@@ -6,22 +6,16 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.ale.openapi.admin.api.TestDataApi;
 import com.ale.service.TestDataService;
 
 /**
- * REST controller for loading and clearing test data in the {@code users} and
- * {@code aleuser} tables.
+ * Implements {@link TestDataApi} – the generated Spring interface derived from
+ * {@code src/main/openapi/admin-api.yaml} (tag: TestData).
  *
- * <p>All load endpoints require an {@code X-Tenant-ID} header (UUID) so that
- * inserted rows are correctly scoped to a tenant and the per-tenant DEK is selected.
- * Clear and DELETE endpoints do not require the header.
+ * <p>All routing annotations live on the interface.
  *
  * <h3>Endpoints</h3>
  * <pre>
@@ -39,10 +33,7 @@ import com.ale.service.TestDataService;
  * </pre>
  */
 @RestController
-@RequestMapping("/test-data")
-public class TestDataController {
-
-    private static final int DEFAULT_COUNT = 100_000;
+public class TestDataController implements TestDataApi {
 
     private final TestDataService testDataService;
 
@@ -52,49 +43,37 @@ public class TestDataController {
 
     // ── Load ─────────────────────────────────────────────────────────────────
 
-    /** Insert {@code count} plaintext {@code User} rows (default 100 000). */
-    @PostMapping("/users/load")
-    public ResponseEntity<Map<String, Object>> loadUsers(
-            @RequestHeader("X-Tenant-ID") UUID tenantId,
-            @RequestParam(defaultValue = "" + DEFAULT_COUNT) int count) {
-        return ResponseEntity.ok(testDataService.loadUsers(count, tenantId));
+    @Override
+    public ResponseEntity<Map<String, Object>> loadUsers(UUID xTenantID, Integer count) {
+        return ResponseEntity.ok(testDataService.loadUsers(count, xTenantID));
     }
 
-    /** Insert {@code count} encrypted {@code ALEUser} rows (default 100 000). */
-    @PostMapping("/ale-users/load")
-    public ResponseEntity<Map<String, Object>> loadALEUsers(
-            @RequestHeader("X-Tenant-ID") UUID tenantId,
-            @RequestParam(defaultValue = "" + DEFAULT_COUNT) int count) {
-        return ResponseEntity.ok(testDataService.loadALEUsers(count, tenantId));
+    @Override
+    public ResponseEntity<Map<String, Object>> loadAleUsers(UUID xTenantID, Integer count) {
+        return ResponseEntity.ok(testDataService.loadALEUsers(count, xTenantID));
     }
 
-    /** Insert {@code count} rows into both tables (default 100 000 each). */
-    @PostMapping("/load")
-    public ResponseEntity<List<Map<String, Object>>> loadAll(
-            @RequestHeader("X-Tenant-ID") UUID tenantId,
-            @RequestParam(defaultValue = "" + DEFAULT_COUNT) int count) {
+    @Override
+    public ResponseEntity<List<Map<String, Object>>> loadAll(UUID xTenantID, Integer count) {
         List<Map<String, Object>> results = new ArrayList<>();
-        results.add(testDataService.loadUsers(count, tenantId));
-        results.add(testDataService.loadALEUsers(count, tenantId));
+        results.add(testDataService.loadUsers(count, xTenantID));
+        results.add(testDataService.loadALEUsers(count, xTenantID));
         return ResponseEntity.ok(results);
     }
 
     // ── Clear ─────────────────────────────────────────────────────────────────
 
-    /** Truncate the {@code users} table. */
-    @DeleteMapping("/users")
+    @Override
     public ResponseEntity<Map<String, Object>> clearUsers() {
         return ResponseEntity.ok(testDataService.clearUsers());
     }
 
-    /** Truncate the {@code aleuser} table. */
-    @DeleteMapping("/ale-users")
-    public ResponseEntity<Map<String, Object>> clearALEUsers() {
+    @Override
+    public ResponseEntity<Map<String, Object>> clearAleUsers() {
         return ResponseEntity.ok(testDataService.clearALEUsers());
     }
 
-    /** Truncate both tables. */
-    @DeleteMapping
+    @Override
     public ResponseEntity<List<Map<String, Object>>> clearAll() {
         List<Map<String, Object>> results = new ArrayList<>();
         results.add(testDataService.clearUsers());
@@ -104,38 +83,29 @@ public class TestDataController {
 
     // ── Reload (clear + load) ─────────────────────────────────────────────────
 
-    /** Truncate {@code users}, then insert {@code count} fresh rows (default 100 000). */
-    @PostMapping("/users/reload")
-    public ResponseEntity<List<Map<String, Object>>> reloadUsers(
-            @RequestHeader("X-Tenant-ID") UUID tenantId,
-            @RequestParam(defaultValue = "" + DEFAULT_COUNT) int count) {
+    @Override
+    public ResponseEntity<List<Map<String, Object>>> reloadUsers(UUID xTenantID, Integer count) {
         List<Map<String, Object>> results = new ArrayList<>();
         results.add(testDataService.clearUsers());
-        results.add(testDataService.loadUsers(count, tenantId));
+        results.add(testDataService.loadUsers(count, xTenantID));
         return ResponseEntity.ok(results);
     }
 
-    /** Truncate {@code aleuser}, then insert {@code count} fresh rows (default 100 000). */
-    @PostMapping("/ale-users/reload")
-    public ResponseEntity<List<Map<String, Object>>> reloadALEUsers(
-            @RequestHeader("X-Tenant-ID") UUID tenantId,
-            @RequestParam(defaultValue = "" + DEFAULT_COUNT) int count) {
+    @Override
+    public ResponseEntity<List<Map<String, Object>>> reloadAleUsers(UUID xTenantID, Integer count) {
         List<Map<String, Object>> results = new ArrayList<>();
         results.add(testDataService.clearALEUsers());
-        results.add(testDataService.loadALEUsers(count, tenantId));
+        results.add(testDataService.loadALEUsers(count, xTenantID));
         return ResponseEntity.ok(results);
     }
 
-    /** Truncate both tables, then insert {@code count} fresh rows in each (default 100 000). */
-    @PostMapping("/reload")
-    public ResponseEntity<List<Map<String, Object>>> reloadAll(
-            @RequestHeader("X-Tenant-ID") UUID tenantId,
-            @RequestParam(defaultValue = "" + DEFAULT_COUNT) int count) {
+    @Override
+    public ResponseEntity<List<Map<String, Object>>> reloadAll(UUID xTenantID, Integer count) {
         List<Map<String, Object>> results = new ArrayList<>();
         results.add(testDataService.clearUsers());
         results.add(testDataService.clearALEUsers());
-        results.add(testDataService.loadUsers(count, tenantId));
-        results.add(testDataService.loadALEUsers(count, tenantId));
+        results.add(testDataService.loadUsers(count, xTenantID));
+        results.add(testDataService.loadALEUsers(count, xTenantID));
         return ResponseEntity.ok(results);
     }
 }
